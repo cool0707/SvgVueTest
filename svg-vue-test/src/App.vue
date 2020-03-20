@@ -1,17 +1,35 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <SvgDemo :width="width" :height="height" />
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import SvgDemo from './components/SvgDemo.vue'
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    SvgDemo
+  },
+  data: function () {
+    return {
+      width: window.innerWidth,
+      height: window.innerHeight
+    }
+  },
+  methods: {
+    handleResize: function() {
+      // resizeのたびにこいつが発火するので、ここでやりたいことをやる
+      this.width = window.innerWidth;
+      this.height = window.innerHeight;
+    }
+  },
+  mounted: function () {
+    window.addEventListener('resize', this.handleResize)
+  },
+  beforeDestroy: function () {
+    window.removeEventListener('resize', this.handleResize)
   }
 }
 </script>

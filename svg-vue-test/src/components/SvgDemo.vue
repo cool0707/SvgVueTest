@@ -7,6 +7,11 @@
         :fill="r.color"
         :x="r.x" :y="r.y" :width="r.w" :height="r.h">
       </rect>
+      <clipPath id="cut-off-bottom">
+        <rect x="50" y="50" width="200" height="200" />
+      </clipPath>
+      <image xlink:href="https://webdesign-trends.net/wp/wp-content/uploads/2019/01/normalize-768x415.png"
+        width="200px" height="400px" preserveAspectRatio="none" clip-path="url(#cut-off-bottom)" />
     </svg>
   </div>
 </template>

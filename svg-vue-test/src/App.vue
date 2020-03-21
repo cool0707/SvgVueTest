@@ -5,6 +5,7 @@
 </template>
 
 <script>
+import 'normalize.css'
 import SvgDemo from './components/SvgDemo.vue'
 
 export default {
@@ -14,8 +15,8 @@ export default {
   },
   data: function () {
     return {
-      width: window.innerWidth,
-      height: window.innerHeight
+      width: window.innerWidth -100,
+      height: window.innerHeight -100
     }
   },
   methods: {
@@ -41,6 +42,6 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
+  background: green;
 }
 </style>

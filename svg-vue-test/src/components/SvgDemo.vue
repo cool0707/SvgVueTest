@@ -2,11 +2,14 @@
   <div class="container">
     <!-- SVG定義 -->
     <svg :width="width" :height="height" :viewBox="viewport" @wheel="zoompan">
-      <rect v-for="(r, idx) in rects" :key="idx"
-        @mousedown="move($event, idx)"
-        :fill="r.color"
-        :x="r.x" :y="r.y" :width="r.w" :height="r.h">
-      </rect>
+      <rect :width="width" :height="height" x="0" y="0" fill="#225511" />
+      <g v-for="(o, idx) in objects" :key="idx" :transform="o.transform" @mousedown.exact="move($event, idx)" @mousedown.ctrl="flipCard($event, idx)">
+        <image xlink:href="http://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png"
+          preserveAspectRatio="none"
+          :clip-path="o.clipPath"
+          :x="o.x" :y="o.y" :width="o.w" :height="o.h" />
+      </g>
+      <!-- top right bottom left clip-path="inset(25% 73.33333% 50% 20%)" -->
     </svg>
   </div>
 </template>
@@ -28,36 +31,7 @@ export default {
       beforeMouseX: null,
       beforeMouseY: null,
       selectIdx: 0,
-      rects: [
-        {
-          x: 10,
-          y: 10,
-          w: 100,
-          h: 100,
-          color: 'green'
-        },
-        {
-          x: 200,
-          y: 150,
-          w: 100,
-          h: 100,
-          color: 'red'
-        },
-        {
-          x: 310,
-          y: 410,
-          w: 200,
-          h: 100,
-          color: 'blue'
-        },
-        {
-          x: 410,
-          y: 200,
-          w: 50,
-          h: 50,
-          color: 'yellow'
-        }
-      ]
+      objects: []
     } 
   },
   // マウス操作関連
@@ -65,6 +39,37 @@ export default {
     console.log('MOUNT LISTENER ON')
     document.addEventListener('mouseup', this.mouseUp)
     document.addEventListener('mousemove', this.mouseMove)
+
+    let w = 1200
+    let h = 400
+
+    let cols = 15
+    let rows = 4
+
+    let cellW = w / cols
+    let cellH = h / rows
+
+    for (let i=0; i<cols; i++) {
+      for (let j=0; j<rows; j++) {
+        this.objects.push({
+          x: -cellW * i,
+          y: -cellH * j,
+          x1: -cellW * i,
+          y1: -cellH * j,
+          x2: -cellW * (cols - 1),
+          y2: -cellH * (rows - 1),
+          w: w,
+          h: h,
+          tx: 0,
+          ty: 0,
+          transform: 'translate(0 0)',
+          bReverse: false,
+          clipPath: 'inset(' + [cellH * j, cellW * (cols - i - 1), cellH * (rows - j - 1), cellW * i].join(' ') + ')',
+          clipPath1: 'inset(' + [cellH * j, cellW * (cols - i - 1), cellH * (rows - j - 1), cellW * i].join(' ') + ')',
+          clipPath2: 'inset(' + [cellH * (rows - 1), 0, 0, cellW * (cols - 1)].join(' ') + ')'
+        })
+      }
+    }
   },
   beforeDestroy () {
     console.log('MOUNT LISTENER OFF')
@@ -126,11 +131,24 @@ export default {
       }
       this.beforeMouseX = mouseX
       this.beforeMouseY = mouseY
-      var tempX = dx + Number(this.rects[this.selectIdx].x)
-      var tempY = dy + Number(this.rects[this.selectIdx].y)
-      if (tempX > 0) this.rects[this.selectIdx].x = tempX
-      if (tempY > 0) this.rects[this.selectIdx].y = tempY
+      var tempX = dx + Number(this.objects[this.selectIdx].tx)
+      var tempY = dy + Number(this.objects[this.selectIdx].ty)
+      if (tempX > 0) this.objects[this.selectIdx].tx = tempX
+      if (tempY > 0) this.objects[this.selectIdx].ty = tempY
+      this.objects[this.selectIdx].transform = 'translate('+ this.objects[this.selectIdx].tx + ' ' +  this.objects[this.selectIdx].ty + ')'
       e.preventDefault()
+    },
+    flipCard (e, i) {
+      if (this.objects[i].bReverse) {
+        this.objects[i].x = this.objects[i].x1
+        this.objects[i].y = this.objects[i].y1
+        this.objects[i].clipPath = this.objects[i].clipPath1
+      } else {
+        this.objects[i].x = this.objects[i].x2
+        this.objects[i].y = this.objects[i].y2
+        this.objects[i].clipPath = this.objects[i].clipPath2
+      }
+      this.objects[i].bReverse = !this.objects[i].bReverse
     }
   }
 }

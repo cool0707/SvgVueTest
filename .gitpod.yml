@@ -6,9 +6,4 @@ ports:
 # List the start up tasks. You can start them in parallel in multiple terminals. See https://www.gitpod.io/docs/config-start-tasks/
 tasks:
   - init: npm install
-<<<<<<< HEAD
     command: cd /workspace/SvgVueTest/svg-vue-test/ && npm run serve
-=======
-    command: cd /workspace/SvgVueTest/svg-vue-test/
-    command: npm run serve
->>>>>>> dab38fcaa9bae414bf26ed4db40c762b477e3589

@@ -2,12 +2,46 @@
   <div class="container">
     <!-- SVG定義 -->
     <svg :width="width" :height="height" :viewBox="viewport" @wheel="zoompan">
+      <filter id="myFilter">
+        <!-- 薄い灰色で領域を塗りつぶす。このレイヤーには「COLOR」と名前をつける -->
+        <feFlood flood-color="#ffbb00" result="COLOR"></feFlood>
+
+        <!-- DROPとCOLORレイヤーを合成し、シャドウに色を付ける。結果には「SHADOW」と名前をつける -->
+        <feComposite in="COLOR" in2="SourceAlpha" operator="in" result="SHADOW"></feComposite>
+
+        <!-- SHADOWレイヤーを右下に20ピクセル分ずらす。新しいレイヤーには「DROPSHADOW」と名前をつける -->
+        <feOffset in="SHADOW" dx="2" dy="2" result="DROPSHADOW1"></feOffset>
+
+        <!-- SHADOWレイヤーを右下に20ピクセル分ずらす。新しいレイヤーには「DROPSHADOW」と名前をつける -->
+        <feOffset in="SHADOW" dx="2" dy="-2" result="DROPSHADOW2"></feOffset>
+
+        <!-- SHADOWレイヤーを右下に20ピクセル分ずらす。新しいレイヤーには「DROPSHADOW」と名前をつける -->
+        <feOffset in="SHADOW" dx="-2" dy="2" result="DROPSHADOW3"></feOffset>
+
+        <!-- SHADOWレイヤーを右下に20ピクセル分ずらす。新しいレイヤーには「DROPSHADOW」と名前をつける -->
+        <feOffset in="SHADOW" dx="-2" dy="-2" result="DROPSHADOW4"></feOffset>
+
+        <!-- 画像が上にくるように、DROPSHADOWとソース画像を重ね合わせる。（MergeNodeの順番が反映されることを忘れずに） -->
+        <feMerge>
+            <feMergeNode in="DROPSHADOW1"></feMergeNode>
+            <feMergeNode in="DROPSHADOW2"></feMergeNode>
+            <feMergeNode in="DROPSHADOW3"></feMergeNode>
+            <feMergeNode in="DROPSHADOW4"></feMergeNode>
+            <feMergeNode in="SourceGraphic"></feMergeNode>
+        </feMerge>
+      </filter>
       <rect :width="width" :height="height" x="0" y="0" fill="#225511" />
-      <g v-for="(o, idx) in objects" :key="idx" :transform="o.transform" @mousedown.exact="move($event, idx)" @mousedown.ctrl="flipCard($event, idx)">
-        <image xlink:href="http://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png"
-          preserveAspectRatio="none"
-          :clip-path="o.clipPath"
-          :x="o.x" :y="o.y" :width="o.w" :height="o.h" />
+      <g v-for="(o, oIdx) in objects" :key="oIdx" 
+        :transform="'translate(' + o.x + ' ' + o.y + ')'"
+        :filter="(selectIdx==oIdx)?'url(#myFilter)':null"
+        @mousedown.exact="move($event, oIdx)" @mousedown.ctrl="flipCard($event, oIdx)">
+        <transition v-for="(f, fIdx) in o.faces" :key="fIdx" name="slide-fade">
+          <image v-if="o.faceIndex == fIdx" xlink:href="http://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png"
+            v-bind:style="{ transformOrigin: (f.w / 2) + 'px ' + (f.h / 2) + 'px' }"
+            preserveAspectRatio="none"
+            :clip-path="f.clipPath"
+            :x="f.x" :y="f.y" :width="o.w" :height="o.h" />
+        </transition>
       </g>
       <!-- top right bottom left clip-path="inset(25% 73.33333% 50% 20%)" -->
     </svg>
@@ -52,21 +86,28 @@ export default {
     for (let i=0; i<cols; i++) {
       for (let j=0; j<rows; j++) {
         this.objects.push({
-          x: -cellW * i,
-          y: -cellH * j,
-          x1: -cellW * i,
-          y1: -cellH * j,
-          x2: -cellW * (cols - 1),
-          y2: -cellH * (rows - 1),
+          faces: [
+            {
+              w: cellW,
+              h: cellH,
+              x: -cellW * i,
+              y: -cellH * j,
+              clipPath: 'inset(' + [cellH * j, cellW * (cols - i - 1), cellH * (rows - j - 1), cellW * i].join(' ') + ')',
+            },
+            {
+              w: cellW,
+              h: cellH,
+              x: -cellW * (cols - 1),
+              y: -cellH * (rows - 1),
+              clipPath: 'inset(' + [cellH * (rows - 1), 0, 0, cellW * (cols - 1)].join(' ') + ')',
+            }
+          ],
           w: w,
           h: h,
-          tx: 0,
-          ty: 0,
-          transform: 'translate(0 0)',
+          x: 0,
+          y: 0,
+          faceIndex: 0,
           bReverse: false,
-          clipPath: 'inset(' + [cellH * j, cellW * (cols - i - 1), cellH * (rows - j - 1), cellW * i].join(' ') + ')',
-          clipPath1: 'inset(' + [cellH * j, cellW * (cols - i - 1), cellH * (rows - j - 1), cellW * i].join(' ') + ')',
-          clipPath2: 'inset(' + [cellH * (rows - 1), 0, 0, cellW * (cols - 1)].join(' ') + ')'
         })
       }
     }
@@ -131,15 +172,14 @@ export default {
       }
       this.beforeMouseX = mouseX
       this.beforeMouseY = mouseY
-      var tempX = dx + Number(this.objects[this.selectIdx].tx)
-      var tempY = dy + Number(this.objects[this.selectIdx].ty)
-      if (tempX > 0) this.objects[this.selectIdx].tx = tempX
-      if (tempY > 0) this.objects[this.selectIdx].ty = tempY
-      this.objects[this.selectIdx].transform = 'translate('+ this.objects[this.selectIdx].tx + ' ' +  this.objects[this.selectIdx].ty + ')'
+      var tempX = dx + Number(this.objects[this.selectIdx].x)
+      var tempY = dy + Number(this.objects[this.selectIdx].y)
+      if (tempX > 0) this.objects[this.selectIdx].x = tempX
+      if (tempY > 0) this.objects[this.selectIdx].y = tempY
       e.preventDefault()
     },
     flipCard (e, i) {
-      if (this.objects[i].bReverse) {
+      /*if (this.objects[i].bReverse) {
         this.objects[i].x = this.objects[i].x1
         this.objects[i].y = this.objects[i].y1
         this.objects[i].clipPath = this.objects[i].clipPath1
@@ -147,9 +187,24 @@ export default {
         this.objects[i].x = this.objects[i].x2
         this.objects[i].y = this.objects[i].y2
         this.objects[i].clipPath = this.objects[i].clipPath2
-      }
+      }*/
+      this.objects[i].faceIndex = (this.objects[i].faceIndex + 1) % this.objects[i].faces.length
       this.objects[i].bReverse = !this.objects[i].bReverse
     }
   }
 }
 </script>
+
+<style>
+.slide-fade-enter-active {
+  transition: all .3s ease;
+}
+.slide-fade-leave-active {
+  transition: all .3s ease;
+}
+.slide-fade-enter, .slide-fade-leave-to
+/* .slide-fade-leave-active below version 2.1.8 */ {
+  transform: rotateY(180deg);
+  opacity: 0;
+}
+</style>

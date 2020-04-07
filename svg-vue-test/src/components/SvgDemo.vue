@@ -45,9 +45,9 @@
       <rect :width="width" :height="height" x="0" y="0" fill="#225511"
         @mousedown.exact="clearSelect()"
         @contextmenu.prevent />
-      <GameObject v-for="(o) in unselected" :key="o.index" v-bind="o" />
+      <GameObject v-for="(o) in unselected" :key="o.id" :id="Number(o.id)" />
       <g filter="url(#myFilter)">
-        <GameObject v-for="(o) in selected" :key="o.index" v-bind="o" />
+        <GameObject v-for="(o) in selected" :key="o.id" :id="Number(o.id)" />
       </g>
       <!-- top right bottom left clip-path="inset(25% 73.33333% 50% 20%)" -->
     </svg>
@@ -55,7 +55,8 @@
 </template>
 
 <script>
-import GameObject from './GameObjectCore.vue'
+import GameObject from './GameObject.vue'
+import { mapMutations, mapGetters } from 'vuex'
 
 export default {
   name: 'SVGDemo',
@@ -83,11 +84,18 @@ export default {
       lastTouchElement: null,
       activeDroppable: null,
       timer: null,
-      objects: [],
-      selected: [],
-      unselected: [],
       movingObjectCallbacks: []
     } 
+  },
+  computed: {
+    ...mapGetters('gameObjects', {
+      all: 'getAll',
+      shown: 'getShown',
+      hidden: 'getHidden',
+      selected: 'getSelected',
+      unselected: 'getUnselected',
+      getById: 'getById'
+    })
   },
   // マウス操作関連
   mounted: function () {
@@ -103,37 +111,31 @@ export default {
 
     for (let i=0; i<cols; i++) {
       for (let j=0; j<rows; j++) {
-        this.objects.push({
-          index: this.objects.length,
-          images: [
-            {
-              source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
-              height: h,
-              width: w,
-              rowSize: rows,
-              colSize: cols,
-              row: j,
-              col: i
-            },
-            {
-              source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
-              height: h,
-              width: w,
-              rowSize: rows,
-              colSize: cols,
-              row: rows - 1,
-              col: cols - 1
-            }
-          ],
-          initX: 0,
-          initY: 0,
-          initAngle: 0
-        })
+        this.add({faces: [
+          {
+            source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
+            height: h,
+            width: w,
+            rowSize: rows,
+            colSize: cols,
+            row: j,
+            col: i
+          },
+          {
+            source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
+            height: h,
+            width: w,
+            rowSize: rows,
+            colSize: cols,
+            row: rows - 1,
+            col: cols - 1
+          }
+        ]})
       }
     }
 
     // 選択状態配列を更新
-    this.updateSelect()
+    //this.updateSelect()
   },
   beforeDestroy: function () {
     console.log('MOUNT LISTENER OFF')
@@ -142,6 +144,10 @@ export default {
     this.clearLongTap()
   },
   methods: {
+    ...mapMutations('gameObjects', [
+      'add',
+      'remove'
+    ]),
     zoompan (e) {
       var [x, y, w, h] = this.viewport.split(' ').map(v => parseFloat(v))
       if (e.ctrlKey) {
@@ -211,10 +217,6 @@ export default {
         // 選択状態配列を更新
         this.updateSelect()
       }
-    },
-    updateSelect () {
-      this.selected = this.objects.filter(o => !o.bHidden && o.bSelected)
-      this.unselected = this.objects.filter(o => !o.bHidden && !o.bSelected)
     },
     toggleSelect (i) {
       this.isMove = true

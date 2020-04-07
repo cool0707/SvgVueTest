@@ -10,7 +10,7 @@
     @mouseleave.prevent ="dragLeave()"
     @contextmenu.prevent >
     <transition v-for="(f, fIdx) in $data.$_faces" :key="fIdx" name="slide-fade">
-      <image v-if="$data.$_faceIndex == fIdx"
+      <image v-if="faceIndex == fIdx"
         preserveAspectRatio="none"
         :xlink:href ="f.image"
         :style ="{
@@ -23,59 +23,57 @@
 </template>
 
 <script>
+import { mapState, mapMutations, mapGetters } from 'vuex'
+
 export default {
   name: 'GameObject',
   props: {
-    index: {
+    id: {
       type: Number,
       required: true
     },
-    initX: {
-      type: Number,
-      default: 0
-    },
-    initY: {
-      type: Number,
-      default: 0
-    },
-    initAngle: {
-      type: Number,
-      default: 0
-    },
-    images: Array
   },
   computed: {
+    ...mapState('gameObjects', {
+      x: function(state) { return state.objects[this.id].x },
+      y: function(state) { return state.objects[this.id].y },
+      angle: function(state) { return state.objects[this.id].angle },
+      bSelected: function(state) { return state.objects[this.id].bSelected },
+      faces: function(state) { return state.objects[this.id].faces },
+      faceIndex: function(state) { return state.objects[this.id].faceIndex }
+    }),
+    ...mapGetters('gameObjects', {
+      _currentFace: 'getCurrentFaceById',
+      _width: 'getWidthById',
+      _height: 'getHeightById',
+    }),
     // trasformプロパティ
     transform: function () {
-      return 'translate(' + [this.x, this.y].join(' ') + ') rotate(' + [this.angle, this.w/2, this.h/2].join(' ') + ')'
+      return 'translate(' + [this.$data.$_x, this.$data.$_y].join(' ') + ') rotate(' + [this.angle, this.width/2, this.height/2].join(' ') + ')'
     },
-    w: function () {
-      return this.$data.$_faces.length ? this.$data.$_faces[this.$data.$_faceIndex].w : 0
+    width: function () {
+      return this.$data.$_faces.length ? this.$data.$_faces[this.faceIndex].w : 0
     },
-    h: function () {
-      return this.$data.$_faces.length ? this.$data.$_faces[this.$data.$_faceIndex].h : 0
+    height: function () {
+      return this.$data.$_faces.length ? this.$data.$_faces[this.faceIndex].h : 0
     }
   },
   data: function () {
     return {
-      id: this.index,
-      x: this.initX,
-      y: this.initY,
-      angle: this.initAngle,
-      $_bSelected: false,
-      $_bHidden: false,
+      $_x: this.x,
+      $_y: this.y,
+      $_angle: this.angle,
+      $_faces: [],
       $_bDragOver: false,
       $_bMoving: false,
       $_longTaptimer: null,
-      $_faces: [],
-      $_faceIndex: 0
     } 
   },
   // マウス操作関連
   mounted: function () {
-    console.log('MOUNT LISTENER ON')
-    this.$data.$_faces = []
-    this.images.forEach((i) => {
+    console.log('MOUNT LISTENER ON: ' + this.id)
+    this.$_faces = []
+    this.faces.forEach((i) => {
       this.$data.$_faces.push({
         w: i.width,
         h: i.height,
@@ -93,6 +91,18 @@ export default {
     this.clearLongTap()
   },
   methods: {
+    ...mapMutations('gameObjects', {
+      setPosition: function (commit, pos) { commit('setPosition', {id: this.id, ...pos}) },
+      rotate: function (commit, pos) { commit('rotate', {id: this.id, ...pos}) },
+      setAngle: function (commit, pos) { commit('setAngle', {id: this.id, ...pos}) },
+      select: function (commit) { 
+        commit('select', {id: this.id})
+      },
+      deselect: function (commit, pos) { commit('deselect', {id: this.id, ...pos}) },
+      show: function (commit, pos) { commit('show', {id: this.id, ...pos}) },
+      hide: function (commit, pos) { commit('hide', {id: this.id, ...pos}) },
+      setFace: function (commit, pos) { commit('setFace', {id: this.id, ...pos}) }
+    }),
     dragEnter() {
       //if (this.isMove) {
         console.log('enter')
@@ -118,15 +128,8 @@ export default {
     onLongTap() {
       console.log('tap')
     },
-    select() {
-      this.$data.$_bSelected = true
-      this.$parent.move(this.id)
-    },
     toggleSelect() {
       this.$data.$_bSelected = !this.$data.$_bSelected
-    },
-    deSelect() {
-      this.$data.$_bSelected = false
     },
     // 図形を動かすフラグを立てる
     moveStart() {
@@ -140,10 +143,10 @@ export default {
     },
     // move中は前回まで動かした差分を取りながら座標を変化させていく
     move(dx, dy) {
-      let tx = dx + Number(this.x)
-      let ty = dy + Number(this.y)
-      if (tx > 10 - this.w) this.x = tx
-      if (ty > 10 - this.h) this.y = ty
+      let tx = dx + Number(this.$_x)
+      let ty = dy + Number(this.$_y)
+      if (tx > 10 - this.width) this.$_x = tx
+      if (ty > 10 - this.height) this.$_y = ty
     },
     // マウスのクリックが終わった段階で初期化
     moveEnd() {

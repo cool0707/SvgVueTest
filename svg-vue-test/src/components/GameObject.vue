@@ -5,28 +5,42 @@
     @mousedown.exact.prevent ="moveStart()"
     @touchstart.exact.prevent ="moveStart()"
     @mousedown.shift.prevent ="toggleSelect()"
-    @mousedown.ctrl.prevent ="flip()"
+    @mousedown.ctrl.prevent ="{if(bSelected){flipSetected()}}"
+    @mousedown.alt.prevent ="{if(bSelected){rotateSetected({angle: 10})}}"
     @mouseenter.prevent ="dragEnter()"
     @mouseleave.prevent ="dragLeave()"
     @contextmenu.prevent >
-    <transition v-for="(f, fIdx) in $data.$_faces" :key="fIdx" name="slide-fade">
-      <image v-if="faceIndex == fIdx"
-        preserveAspectRatio="none"
-        :xlink:href ="f.image"
-        :style ="{
-          transformOrigin: (f.w / 2) + 'px ' + (f.h / 2) + 'px',
-          pointerEvents: $data.$_bMoving ? 'none' : 'auto'}"     
-        :clip-path ="f.clipPath"
-        :x ="f.x" :y ="f.y" :width="f.imageWidth" :height="f.imageHeight" />
+    <transition name="slide-fade">
+      <GameImage :key ="faceIndex" v-bind ="currentFace"
+        :enablePointerEvent ="!$data.$_bMoving"/>
     </transition>
+    <g>
+      <circle :cx="width" cy="0" r="10" stroke="none" fill="#555555">
+      </circle>
+      <text :x="width" y="0" fill="#DDDDDD" font-weight="bold" font-family="Verdana" font-size="12" text-anchor = "middle" dominant-baseline = "central">
+        5
+      </text>
+    </g>
   </g>
 </template>
 
 <script>
-import { mapState, mapMutations, mapGetters } from 'vuex'
+import GameImage from './GameImage.vue'
+import { mapMutations } from 'vuex'
+
+/*function hoge(computed, args) {
+  let res = {}
+  Object.entries(computed).forEach(function ([key, val]) {
+    res[key] = function () { return val.call(this, state, getters, ...args) }
+  })
+  return res
+}*/
 
 export default {
   name: 'GameObject',
+  components: {
+    GameImage
+  },
   props: {
     id: {
       type: Number,
@@ -34,36 +48,47 @@ export default {
     },
   },
   computed: {
-    ...mapState('gameObjects', {
-      x: function(state) { return state.objects[this.id].x },
-      y: function(state) { return state.objects[this.id].y },
-      angle: function(state) { return state.objects[this.id].angle },
-      bSelected: function(state) { return state.objects[this.id].bSelected },
-      faces: function(state) { return state.objects[this.id].faces },
-      faceIndex: function(state) { return state.objects[this.id].faceIndex }
-    }),
-    ...mapGetters('gameObjects', {
-      _currentFace: 'getCurrentFaceById',
-      _width: 'getWidthById',
-      _height: 'getHeightById',
-    }),
+    object: function () {
+      return this.$store.getters['gameObjects/getById'](this.id)
+    },
+    x: function () {
+      return this.object.x
+    },
+    y: function () {
+      return this.object.y
+    },
+    angle: function () {
+      return this.object.angle
+    },
+    bSelected: function () {
+      return this.object.bSelected
+    },
+    faces: function () {
+      return this.object.faces
+    },
+    faceIndex: function () {
+      return this.object.faceIndex
+    },
+    currentFace: function () {
+      return this.$store.getters['gameObjects/getCurrentFaceById'](this.id)
+    },
+    width: function () {
+      return this.$store.getters['gameObjects/getWidthById'](this.id)
+    },
+    height: function () {
+      return this.$store.getters['gameObjects/getHeightById'](this.id)
+    },
     // trasformプロパティ
     transform: function () {
       return 'translate(' + [this.$data.$_x, this.$data.$_y].join(' ') + ') rotate(' + [this.angle, this.width/2, this.height/2].join(' ') + ')'
+      //return 'translate(' + [this.x, this.y].join(' ') + ') rotate(' + [this.angle, this.width/2, this.height/2].join(' ') + ')'
     },
-    width: function () {
-      return this.$data.$_faces.length ? this.$data.$_faces[this.faceIndex].w : 0
-    },
-    height: function () {
-      return this.$data.$_faces.length ? this.$data.$_faces[this.faceIndex].h : 0
-    }
   },
   data: function () {
     return {
-      $_x: this.x,
-      $_y: this.y,
-      $_angle: this.angle,
-      $_faces: [],
+      $_x: 0,
+      $_y: 0,
+      $_angle: 0,
       $_bDragOver: false,
       $_bMoving: false,
       $_longTaptimer: null,
@@ -71,37 +96,37 @@ export default {
   },
   // マウス操作関連
   mounted: function () {
-    console.log('MOUNT LISTENER ON: ' + this.id)
-    this.$_faces = []
-    this.faces.forEach((i) => {
-      this.$data.$_faces.push({
-        w: i.width,
-        h: i.height,
-        x: -i.width * i.col,
-        y: -i.height * i.row,
-        image: i.source,
-        imageWidth: i.width * i.colSize,
-        imageHeight: i.height * i.rowSize,
-        clipPath: 'inset(' + [i.height * i.row, i.width * (i.colSize - i.col - 1), i.height * (i.rowSize - i.row - 1), i.width * i.col].join(' ') + ')',
-      })
-    })
+    console.log('MOUNT LISTENER ON: ' + this.id + ' [' + this.x + ':' + this.y + ']')
+    if (this.bSelected) {
+      this.$parent.reigisterSelectedComponent(this)
+    }
+
+    this.$data.$_x = this.x
+    this.$data.$_y = this.y
+    this.$data.$_angle = this.angle    
   },
   beforeDestroy: function () {
-    console.log('MOUNT LISTENER OFF')
+    console.log('MOUNT LISTENER OFF: ' + this.id + ' [' + this.$data.$_x + ':' + this.$data.$_y + ']')
+    if (this.bSelected) {
+      this.$parent.unregisterSelectedComponent(this)
+    }
+    this.setPosition(this.$data.$_x, this.$data.$_y)
+    this.setAngle(this.$data.$_angle)
     this.clearLongTap()
   },
   methods: {
     ...mapMutations('gameObjects', {
-      setPosition: function (commit, pos) { commit('setPosition', {id: this.id, ...pos}) },
-      rotate: function (commit, pos) { commit('rotate', {id: this.id, ...pos}) },
-      setAngle: function (commit, pos) { commit('setAngle', {id: this.id, ...pos}) },
-      select: function (commit) { 
-        commit('select', {id: this.id})
-      },
-      deselect: function (commit, pos) { commit('deselect', {id: this.id, ...pos}) },
-      show: function (commit, pos) { commit('show', {id: this.id, ...pos}) },
-      hide: function (commit, pos) { commit('hide', {id: this.id, ...pos}) },
-      setFace: function (commit, pos) { commit('setFace', {id: this.id, ...pos}) }
+      setPosition: function (commit, x, y) { commit('setPosition', {id: this.id, x, y}) },
+      rotate: function (commit, angle) { commit('rotate', {id: this.id, angle}) },
+      rotateSetected: 'rotateSetected',
+      setAngle: function (commit, angle) { commit('setAngle', {id: this.id, angle}) },
+      select: function (commit) { commit('select', {id: this.id})},
+      deselect: function (commit) { commit('deselect', {id: this.id}) },
+      show: function (commit) { commit('show', {id: this.id}) },
+      hide: function (commit) { commit('hide', {id: this.id}) },
+      setFace: function (commit, index) { commit('setFace', {id: this.id, index}) },
+      flip: function (commit) { commit('flip', {id: this.id}) },
+      flipSetected: 'flipSetected'
     }),
     dragEnter() {
       //if (this.isMove) {
@@ -138,24 +163,23 @@ export default {
       }
       console.log('moveStart')
       this.$data.$_bMoving = true
-      this.$parent.addMovingObject(this.move, this.moveEnd)
       //document.addEventListener('mousemove', function (e) {console.log(e.x + ':' + e.y)})
     },
     // move中は前回まで動かした差分を取りながら座標を変化させていく
     move(dx, dy) {
-      let tx = dx + Number(this.$_x)
-      let ty = dy + Number(this.$_y)
-      if (tx > 10 - this.width) this.$_x = tx
-      if (ty > 10 - this.height) this.$_y = ty
+      let tx = dx + this.$data.$_x
+      let ty = dy + this.$data.$_y
+      if (!tx) tx = dx
+      if (!ty) ty = dy
+      if (tx > 10 - this.width) this.$data.$_x = tx
+      if (ty > 10 - this.height) this.$data.$_y = ty
+      //console.log(dx + ':' + dy)
+      //console.log(this.$data.$_x + ':' + this.$data.$_y)
     },
     // マウスのクリックが終わった段階で初期化
     moveEnd() {
       this.$data.$_bMoving = false
       this.clearLongTap()
-    },
-    flip() {
-      this.$data.$_faceIndex = (this.$data.$_faceIndex + 1) % this.$data.$_faces.length
-      this.$data.$_bReverse = !this.$data.$_bReverse
     }
   }
 }

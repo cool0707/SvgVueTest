@@ -38,6 +38,15 @@ export const gameObjects = {
       let object = getObject(state, id)
       updateProperty(state, id, {x: object.x + x, y: object.y + y})
     },
+    moveSetected(state, {x, y}) {
+      state.objects = state.objects.map(object => {
+        if (object.bSelected) {
+          object.x += x
+          object.y += y
+        }
+        return object
+      })
+    },
     setPosition(state, {id, x, y}) {
       updateProperty(state, id, {x: x, y: y})
     },
@@ -45,11 +54,18 @@ export const gameObjects = {
       let object = getObject(state, id)
       updateProperty(state, id, {angle: object.angle + angle})
     },
+    rotateSetected(state, {angle}) {
+      state.objects = state.objects.map(object => {
+        if (object.bSelected) {
+          object.angle += angle
+        }
+        return object
+      })
+    },
     setAngle(state, {id, angle}) {
       updateProperty(state, id, {angle: angle})
     },
     select(state, {id}) {
-      console.log(id)
       updateProperty(state, id, {bSelected: true})
     },
     deselect(state, {id}) {
@@ -64,6 +80,19 @@ export const gameObjects = {
     setFace(state, {id, faceIndex}) {
       updateProperty(state, id, {faceIndex: faceIndex})
     },
+    flip(state, {id}) {
+      let object = getObject(state, id)
+      updateProperty(state, id, {faceIndex: (object.faceIndex + 1) % object.faces.length})
+    },
+    flipSetected(state) {
+      //updateProperty(state, id, {faceIndex: (object.faceIndex + 1) % object.faces.length})
+      state.objects = state.objects.map(object => {
+        if (object.bSelected) {
+          object.faceIndex = (object.faceIndex + 1) % object.faces.length
+        }
+        return object
+      })
+    }
   },
   getters: {
     getAll: state => {

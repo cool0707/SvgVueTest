@@ -1,7 +1,7 @@
 <template>
   <div class="container"
-    @mouseup.prevent="mouseUp($event)" @mousemove.prevent="mouseMove($event)"
-    @touchend.prevent="mouseUp($event)" @touchmove.prevent="mouseMove($event)">
+    @mousedown.prevent="mouseDown($event)" @mouseup.prevent="mouseUp($event)" @mousemove.prevent="mouseMove($event)"
+    @touchstart.prevent="mouseDown($event)" @touchend.prevent="mouseUp($event)" @touchmove.prevent="mouseMove($event)">
     <!-- SVG定義 -->
     <svg :width="width" :height="height" :viewBox="viewport" @wheel="zoompan">
       <filter id="myFilter" filterUnits="userSpaceOnUse" x="-5" y="-5">
@@ -82,9 +82,9 @@ export default {
       beforeMouseX: null,
       beforeMouseY: null,
       lastTouchElement: null,
-      activeDroppable: null,
       timer: null,
-      movingObjectCallbacks: []
+      selectedComponent: [],
+      timeTotal: []
     } 
   },
   computed: {
@@ -111,24 +111,27 @@ export default {
 
     for (let i=0; i<cols; i++) {
       for (let j=0; j<rows; j++) {
-        this.add({faces: [
+        this.add({
+          x: 0,
+          y: 2,
+          faces: [
           {
             source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
             height: h,
             width: w,
-            rowSize: rows,
-            colSize: cols,
+            rowCount: rows,
+            columnCount: cols,
             row: j,
-            col: i
+            column: i
           },
           {
             source: 'https://blog-imgs-42.fc2.com/p/i/p/piposozai/cardss.png',
             height: h,
             width: w,
-            rowSize: rows,
-            colSize: cols,
+            rowCount: rows,
+            columnCount: cols,
             row: rows - 1,
-            col: cols - 1
+            column: cols - 1
           }
         ]})
       }
@@ -146,7 +149,8 @@ export default {
   methods: {
     ...mapMutations('gameObjects', [
       'add',
-      'remove'
+      'remove',
+      'moveSetected'
     ]),
     zoompan (e) {
       var [x, y, w, h] = this.viewport.split(' ').map(v => parseFloat(v))
@@ -177,102 +181,58 @@ export default {
       }
     },
     // viewboxを作成
-    makeViewBox (x, y, w, h) {
+    makeViewBox(x, y, w, h) {
       this.viewport = [x, y, w, h].join(' ')
     },
-    dragEnter (i) {
-      if (this.isMove) {
-        //this.objects[i].bDropping = true
-        this.startLongTap(i)
-      }
-    },
-    dragLeave (i) {
-      if (this.isMove) {
-        this.objects[i].bDropping = false
-        this.activeDroppable = null
-        this.clearLongTap()
-      }
-    },
-    startLongTap (i) {
-      this.timer = window.setTimeout(this.longTap, 800, i)
-    },
-    clearLongTap () {
-      if (this.timer) {
-        window.clearTimeout(this.timer)
-        this.timer = null
-      }
-    },
-    longTap (i) {
-      this.objects[i].bDropping = true
-      this.activeDroppable = this.objects[i]
+    clearSelect() {
+      this.selected.forEach(o => {
+        this.$store.commit('gameObjects/deselect', {id: o.id})
+      })
     },
     // 図形を動かすフラグを立てる
-    move (i) {
+    mouseDown() {
       this.isMove = true
-
-      if (!this.objects[i].bSelected) {
-        this.clearSelect()
-        this.objects[i].bSelected = true
-
-        // 選択状態配列を更新
-        this.updateSelect()
-      }
-    },
-    toggleSelect (i) {
-      this.isMove = true
-
-      if (this.objects[i].bSelected) {
-        this.objects[i].bSelected = false
-      } else {
-        this.objects[i].bSelected = true
-      }
-
-      // 選択状態配列を更新
-      this.updateSelect()
     },
     // マウスのクリックが終わった段階で初期化
-    mouseUp () {
+    mouseUp() {
       this.isMove = false
       if (this.beforeMouseX && this.beforeMouseY) {
         this.beforeMouseX = null
         this.beforeMouseY = null
       }
-      if (this.activeDroppable) {
-        this.selected.forEach(o => {
-          o.bHidden = true
-        })
-        this.activeDroppable.bDropping = false
-        this.activeDroppable = null
-        this.clearSelect()
+
+      if (this.timeTotal.length) {
+        console.log(this.timeTotal.reduce((acc, cur) => acc + cur) / this.timeTotal.length)
+        this.timeTotal = []
       }
-      this.movingObjectCallbacks.forEach(o => {
+      /*this.movingObjectCallbacks.forEach(o => {
         o.end()
       })
-      this.movingObjectCallbacks = []
+      this.movingObjectCallbacks = []*/
+
+      // タッチデバイス用にmouseleaveイベントを発火
       if (this.lastTouchElement) {
         let event = document.createEvent("mouseevents")
         event.initEvent("mouseleave", true, true)
         this.lastTouchElement.dispatchEvent(event)
         this.lastTouchElement = null
       }
-      this.clearLongTap()
     },
-    clearSelect () {
-      this.selected.forEach(o => o.bSelected = false)
-      
-      // 選択状態配列を更新
-      this.updateSelect()
+    reigisterSelectedComponent(comp) {
+      console.log('reigisterSelectedComponent')
+      this.selectedComponent.push(comp)
     },
-    addMovingObject (move, moveEnd) {
-      console.log('addMovingObject')
-      this.movingObjectCallbacks.push({move: move, end:moveEnd})
+    unregisterSelectedComponent(comp) {
+      console.log('unreigisterSelectedComponent')
+      this.selectedComponent = this.selectedComponent.filter( c => c.id != comp.id)
     },
     // move中は前回まで動かした差分を取りながら座標を変化させていく
     mouseMove (e) {
-      //if (!this.isMove || !this.selected) return
+      if (!this.isMove) return
       let mouseX = 0
       let mouseY = 0
 
+      // 現在マウス位置を取得
       switch (e.type) {
         case 'mousemove':
           mouseX = e.offsetX * this.ratio + this.dx
@@ -283,6 +243,7 @@ export default {
             mouseX = e.touches[0].pageX * this.ratio + this.dx
             mouseY = e.touches[0].pageY * this.ratio + this.dy
 
+            // タッチデバイス用にmouseenter、mouseleaveイベントを発火
             if (this.lastTouchElement !== e.touches[0].target) {
               let event = document.createEvent("mouseevents")
               event.initEvent("mouseenter", true, true)
@@ -300,37 +261,32 @@ export default {
           break
       }
 
+      // マウス位置から差分を取得
       let dx = 0
       let dy = 0
       if (this.beforeMouseX && this.beforeMouseY) {
           dx = mouseX - this.beforeMouseX
           dy = mouseY - this.beforeMouseY
       }
+
+      // マウス位置を保管
       this.beforeMouseX = mouseX
       this.beforeMouseY = mouseY
-      /*this.selected.forEach(o => {
-        let tempX = dx + Number(o.x)
-        let tempY = dy + Number(o.y)
-        if (tempX > 10 - o.w) o.x = tempX
-        if (tempY > 10 - o.h) o.y = tempY
-      })*/
-      console.log('mouseMove' + e.type)
-      this.movingObjectCallbacks.forEach(o => {
-        o.move(dx, dy)
+
+      const startTime = performance.now() // 開始時間
+      // 選択中のコンポーネントを移動させる
+      //console.log('mouseMove' + e.type)
+      this.selectedComponent.forEach(c => {
+        c.move(dx, dy)
       })
-      //e.preventDefault()
+      //this.moveSetected({x:dx, y:dy})
+      /*this.selected.forEach(o => {
+        this.$store.commit('gameObjects/move', {id: o.id, x: dx, y:dy})
+      })*/
+      const endTime = performance.now() // 終了時間
+
+      this.timeTotal.push(endTime - startTime); // 何ミリ秒かかったかを表示する
     },
-    flipCard (i) {
-      if (this.selected) {
-        this.selected.forEach(o => {
-          o.faceIndex = (o.faceIndex + 1) % o.faces.length
-          o.bReverse = !o.bReverse
-        })
-      } else {
-        this.objects[i].faceIndex = (this.objects[i].faceIndex + 1) % this.objects[i].faces.length
-        this.objects[i].bReverse = !this.objects[i].bReverse
-      }
-    }
   }
 }
 </script>

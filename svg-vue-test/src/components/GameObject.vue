@@ -12,7 +12,7 @@
     @contextmenu.prevent >
     <transition name="slide-fade">
       <GameImage :key ="faceIndex" v-bind ="currentFace"
-        :enablePointerEvent ="!$data.$_bMoving"/>
+        :enablePointerEvent ="!bDragging"/>
     </transition>
     <g>
       <circle :cx="width" cy="0" r="10" stroke="none" fill="#555555">
@@ -60,8 +60,21 @@ export default {
     angle: function () {
       return this.object.angle
     },
-    bSelected: function () {
-      return this.object.bSelected
+    bSelected:{
+      get: function () {
+        return this.object.bSelected
+      },
+      set: function (newValue) {
+        this.$store.commit('gameObjects/setSelected', {id: this.id, bSelected: newValue})
+      }
+    },
+    bDragging:{
+      get: function () {
+        return this.object.bDragging
+      },
+      set: function (newValue) {
+        this.$store.commit('gameObjects/setDragging', {id: this.id, bDragging: newValue})
+      }
     },
     faces: function () {
       return this.object.faces
@@ -96,21 +109,22 @@ export default {
   },
   // マウス操作関連
   mounted: function () {
-    console.log('MOUNT LISTENER ON: ' + this.id + ' [' + this.x + ':' + this.y + ']')
+    console.log('MOUNT: ' + this.id + ' [' + this.x + ':' + this.y + ']' + (this.bSelected?' selected':'') + (this.bDragging?' dragging':''))
     if (this.bSelected) {
       this.$parent.reigisterSelectedComponent(this)
     }
 
     this.$data.$_x = this.x
     this.$data.$_y = this.y
-    this.$data.$_angle = this.angle    
+    this.$data.$_angle = this.angle
+    
+    this.$data.$_bSelected = this.bSelected
   },
   beforeDestroy: function () {
-    console.log('MOUNT LISTENER OFF: ' + this.id + ' [' + this.$data.$_x + ':' + this.$data.$_y + ']')
-    if (this.bSelected) {
+    console.log('DESTORY: ' + this.id + ' [' + this.$data.$_x + ':' + this.$data.$_y + ']' + (this.bSelected?' selected':'') + (this.bDragging?' dragging':''))
+    if (this.$data.$_bSelected) {
       this.$parent.unregisterSelectedComponent(this)
     }
-    this.setPosition(this.$data.$_x, this.$data.$_y)
     this.setAngle(this.$data.$_angle)
     this.clearLongTap()
   },
@@ -130,7 +144,7 @@ export default {
     }),
     dragEnter() {
       //if (this.isMove) {
-        console.log('enter')
+        console.log('enter: ' + this.id + (this.bSelected?'selected':''))
         this.$data.$_bDragOver = true
         this.startLongTap()
       //}
@@ -151,18 +165,21 @@ export default {
       }
     },
     onLongTap() {
-      console.log('tap')
+      console.log('tap: ' + this.id + (this.bSelected?' selected':''))
     },
     toggleSelect() {
-      this.$data.$_bSelected = !this.$data.$_bSelected
+      //this.$data.$_bSelected = !this.$data.$_bSelected
     },
     // 図形を動かすフラグを立てる
     moveStart() {
       if (!this.$data.$_bSelected) {
         this.select()
       }
-      console.log('moveStart')
+
+      console.log('moveStart: ' + this.id + (this.bSelected?' selected':''))
       this.$data.$_bMoving = true
+      this.bDragging = true
+      
       //document.addEventListener('mousemove', function (e) {console.log(e.x + ':' + e.y)})
     },
     // move中は前回まで動かした差分を取りながら座標を変化させていく
@@ -179,6 +196,8 @@ export default {
     // マウスのクリックが終わった段階で初期化
     moveEnd() {
       this.$data.$_bMoving = false
+      this.bDragging = false
+      this.setPosition(this.$data.$_x, this.$data.$_y)
       this.clearLongTap()
     }
   }

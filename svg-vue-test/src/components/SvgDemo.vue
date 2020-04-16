@@ -43,11 +43,12 @@
         </feMerge>
       </filter>
       <rect :width="width" :height="height" x="0" y="0" fill="#225511"
-        @mousedown.exact="clearSelect()"
+        @mousedown.exact.prevent="clearSelect()"
+        @mousedown.ctrl.prevent="shuffle()"
         @contextmenu.prevent />
-      <GameObject v-for="(o) in unselected" :key="o.id" :id="Number(o.id)" />
+      <GameObject v-for="(o) in unselected" :key="o.id" :a="o.id" :id="Number(o.id)" />
       <g filter="url(#myFilter)">
-        <GameObject v-for="(o) in selected" :key="o.id" :id="Number(o.id)" />
+        <GameObject v-for="(o) in selected" :key="o.id" :a="o.id" :id="Number(o.id)" />
       </g>
       <!-- top right bottom left clip-path="inset(25% 73.33333% 50% 20%)" -->
     </svg>
@@ -109,8 +110,8 @@ export default {
     let cols = 15
     let rows = 4
 
-    for (let i=0; i<cols; i++) {
-      for (let j=0; j<rows; j++) {
+    for (let i=0; i<5; i++) {
+      for (let j=0; j<2; j++) {
         this.add({
           x: 0,
           y: 2,
@@ -150,7 +151,8 @@ export default {
     ...mapMutations('gameObjects', [
       'add',
       'remove',
-      'moveSetected'
+      'moveSetected',
+      'shuffle'
     ]),
     zoompan (e) {
       var [x, y, w, h] = this.viewport.split(' ').map(v => parseFloat(v))
@@ -185,9 +187,10 @@ export default {
       this.viewport = [x, y, w, h].join(' ')
     },
     clearSelect() {
-      this.selected.forEach(o => {
+      /*this.selected.forEach(o => {
         this.$store.commit('gameObjects/deselect', {id: o.id})
-      })
+      })*/
+      this.$store.commit('gameObjects/releaseSetected')
     },
     // 図形を動かすフラグを立てる
     mouseDown() {
@@ -201,14 +204,20 @@ export default {
         this.beforeMouseY = null
       }
 
+      // デバッグ用
       if (this.timeTotal.length) {
         console.log(this.timeTotal.reduce((acc, cur) => acc + cur) / this.timeTotal.length)
         this.timeTotal = []
       }
+
+      // 選択オブジェクトごとに移動終了処理を行う
       /*this.movingObjectCallbacks.forEach(o => {
         o.end()
       })
       this.movingObjectCallbacks = []*/
+      this.selectedComponent.forEach(c => {
+        c.moveEnd()
+      })
 
       // タッチデバイス用にmouseleaveイベントを発火
       if (this.lastTouchElement) {

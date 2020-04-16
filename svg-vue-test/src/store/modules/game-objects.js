@@ -3,9 +3,22 @@ function getObject(state, id) {
 }
 
 function updateProperty(state, id, props) {
-  let object = state.objects[id]
-  Object.assign(object, props)
-  state.objects.splice(id, 1, object)
+  delete props.id
+  state.objects = state.objects.map(obj => {
+    if (obj.id == id) {
+      Object.assign(obj, props)
+    }
+    return obj
+  })
+}
+
+function arrayShuffle([...arr]) {
+  let j = arr.length;
+  while (j) {
+    const i = Math.floor(Math.random() * j--);
+    [arr[j], arr[i]] = [arr[i], arr[j]];
+  }
+  return arr;
 }
 
 export const gameObjects = {
@@ -23,12 +36,12 @@ export const gameObjects = {
         bSelected: false,
         bHidden: false,
         bDragOver: false,
-        bMoving: false,
+        bDragging: false,
         faces: [],
         faceIndex: 0
       }, props)
 
-      object.id = ++state.lastIssuedId
+      object.id = Number(++state.lastIssuedId)
       state.objects.push(object)
     },
     remove(state, {id}) {
@@ -71,6 +84,13 @@ export const gameObjects = {
     deselect(state, {id}) {
       updateProperty(state, id, {bSelected: false})
     },
+    setSelected(state, {id,bSelected}) {
+      updateProperty(state, id, {bSelected: bSelected})
+    },
+    setDragging(state, {id, bDragging}) {
+      console.log('DRAG!!!!! ' + bDragging)
+      updateProperty(state, id, {bDragging: bDragging})
+    },
     show(state, {id}) {
       updateProperty(state, id, {bHidden: false})
     },
@@ -85,13 +105,30 @@ export const gameObjects = {
       updateProperty(state, id, {faceIndex: (object.faceIndex + 1) % object.faces.length})
     },
     flipSetected(state) {
-      //updateProperty(state, id, {faceIndex: (object.faceIndex + 1) % object.faces.length})
       state.objects = state.objects.map(object => {
         if (object.bSelected) {
           object.faceIndex = (object.faceIndex + 1) % object.faces.length
         }
         return object
       })
+    },
+    releaseSetected(state) {
+      state.objects.sort((obj1, obj2) => {
+        if (obj1.bSelected && !obj2.bSelected) {
+          return 1
+        } else if (!obj1.bSelected && obj2.bSelected) {
+          return -1
+        } else {
+          return 0
+        }
+      })
+      state.objects = state.objects.map( obj => {
+        obj.bSelected = false
+        return obj
+      })
+    },
+    shuffle(state) {
+      state.objects = arrayShuffle(state.objects)
     }
   },
   getters: {
